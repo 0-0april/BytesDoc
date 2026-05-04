@@ -1,0 +1,24 @@
+.claude/
+
+# build / dependency artifacts
+backend/node_modules/
+backend/dist/
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+
+# env files
+.env
+.env.local
+.env.*.local
+
+# logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# local reference assets
+/database diagram.png
