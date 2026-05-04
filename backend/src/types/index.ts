@@ -1,0 +1,31 @@
+export type Role = 'chief_minister' | 'secretary' | 'finance_minister' | 'member'
+
+export interface User {
+  id: string
+  email: string
+  fullName: string
+  role: Role
+  createdAt: string
+}
+
+export interface Document {
+  id: string
+  title: string
+  category: 'Proposals' | 'Permits' | 'Budgets' | 'Reports' | 'Financial Records'
+  event: string
+  administration: string
+  uploadedBy: string
+  uploadDate: string
+  filePath: string
+  is_archived: boolean
+  is_locked: boolean
+  fileType: 'pdf' | 'docx'
+}
+
+export interface ActivityLog {
+  id: string
+  userId: string
+  action: 'upload' | 'download' | 'view' | 'archive' | 'login'
+  documentId?: string
+  timestamp: string
+}
