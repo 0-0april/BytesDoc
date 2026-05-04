@@ -1,5 +1,3 @@
-.claude/
-
 # build / dependency artifacts
 backend/node_modules/
 backend/dist/
