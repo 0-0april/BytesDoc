@@ -140,13 +140,10 @@ backend/
 | PUT    | `/api/documents/:id`           | yes | uploader OR chief_minister                         | edit metadata; 409 if archived/locked |
 | DELETE | `/api/documents/:id`           | yes | uploader OR chief_minister                         | hard delete (DB + storage); 409 if archived |
 | GET    | `/api/documents/:id/download`  | yes | any (filtered by role)                             | returns 60s signed URL; logs `download` |
+| POST   | `/api/documents/:id/archive`   | yes | chief_minister                                     | sets `is_archived` + `is_locked` true; 409 if already archived; logs `archive` |
+| POST   | `/api/documents/archive-bulk`  | yes | chief_minister                                     | body `{ administration }`; archives all unarchived docs for that term; returns `{ administration, archivedCount, archivedIds }`; logs `archive` per doc |
 
 ### Planned
-
-#### Archive — `feature/backend-documents-archive`
-
-- `POST /api/documents/:id/archive` — sets `is_archived = true` and `is_locked = true` on a single doc. Archived docs are still viewable and downloadable but can't be edited or deleted. Chief minister only.
-- `POST /api/documents/archive-bulk` — archives every document for a given administration term (e.g. archive all `2024-2025` docs at end of term). Body: `{ administration: string }`. Chief minister only.
 
 #### Users management — `feature/backend-users`
 
