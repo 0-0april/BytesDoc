@@ -55,8 +55,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       const docs = await apiGetDocuments(query)
       set({ documents: docs, loading: false })
     } catch (e: any) {
-      // If real API fails, fall back to mock silently
-      set({ documents: mockDocuments, loading: false, error: e.message })
+      set({ documents: [], loading: false, error: e.message })
     }
   },
 

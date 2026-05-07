@@ -13,16 +13,15 @@ export default function LoginPage() {
   const login = useAuthStore((state) => state.login)
   const addLog = useActivityStore((state) => state.addLog)
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    const success = login(email, password)
-    
+    const success = await login(email, password)
+
     if (success) {
       const user = useAuthStore.getState().user
       if (user) {
         addLog({ userId: user.id, action: 'login' })
-        
-        // Redirect based on role
+
         const roleRoutes = {
           chief_minister: '/dashboard/admin',
           secretary: '/dashboard/secretary',

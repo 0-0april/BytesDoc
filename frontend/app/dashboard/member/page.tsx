@@ -19,7 +19,7 @@ export default function MemberDashboard() {
   const searchParams = useSearchParams()
   const tab = searchParams.get('tab') || 'dashboard'
   
-  const { user, isAuthenticated } = useAuthStore()
+  const { user, isAuthenticated, hasHydrated } = useAuthStore()
   const { documents } = useDocumentStore()
   const { users } = useUserStore()
   const { addLog } = useActivityStore()
@@ -29,10 +29,11 @@ export default function MemberDashboard() {
   const [selectedDoc, setSelectedDoc] = useState<Document | null>(null)
 
   useEffect(() => {
+    if (!hasHydrated) return
     if (!isAuthenticated || user?.role !== 'member') {
       router.push('/login')
     }
-  }, [isAuthenticated, user, router])
+  }, [hasHydrated, isAuthenticated, user, router])
 
   if (!user) return null
 

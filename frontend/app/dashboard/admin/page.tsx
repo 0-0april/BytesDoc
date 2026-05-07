@@ -36,7 +36,7 @@ export default function AdminDashboard() {
   const searchParams = useSearchParams()
   const tab = searchParams.get('tab') || 'dashboard'
 
-  const { user, isAuthenticated, usingMock } = useAuthStore()
+  const { user, isAuthenticated, usingMock, hasHydrated } = useAuthStore()
   const {
     documents,
     fetchDocuments,
@@ -66,10 +66,11 @@ export default function AdminDashboard() {
 
   // ── Auth guard ──────────────────────────────────────────────────────────
   useEffect(() => {
+    if (!hasHydrated) return
     if (!isAuthenticated || user?.role !== 'chief_minister') {
       router.push('/login')
     }
-  }, [isAuthenticated, user, router])
+  }, [hasHydrated, isAuthenticated, user, router])
 
   // ── Data fetching ───────────────────────────────────────────────────────
   useEffect(() => {
