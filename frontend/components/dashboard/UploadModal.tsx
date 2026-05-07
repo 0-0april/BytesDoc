@@ -8,20 +8,18 @@ import { mockCategories, mockEvents, mockAdministrations } from '@/lib/mockData'
 interface UploadModalProps {
   isOpen: boolean
   onClose: () => void
-  onUpload: (data: {
-    title: string
-    category: string
-    event: string
-    administration: string
-  }) => void
+  onUpload: (
+    data: { title: string; category: string; event: string; administration: string },
+    file?: File | null
+  ) => void
   allowedCategories?: string[]
 }
 
-export default function UploadModal({ 
-  isOpen, 
-  onClose, 
+export default function UploadModal({
+  isOpen,
+  onClose,
   onUpload,
-  allowedCategories = mockCategories 
+  allowedCategories = mockCategories,
 }: UploadModalProps) {
   const [formData, setFormData] = useState({
     title: '',
@@ -29,19 +27,21 @@ export default function UploadModal({
     event: 'Freshmen Orientation',
     administration: '2024-2025',
   })
+  const [file, setFile] = useState<File | null>(null)
 
   const handleSubmit = () => {
     if (!formData.title.trim()) {
       alert('Please enter a title')
       return
     }
-    onUpload(formData)
+    onUpload(formData, file)
     setFormData({
       title: '',
       category: allowedCategories[0] || 'Proposals',
       event: 'Freshmen Orientation',
       administration: '2024-2025',
     })
+    setFile(null)
   }
 
   return (
@@ -54,7 +54,7 @@ export default function UploadModal({
           <input
             type="text"
             value={formData.title}
-            onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+            onChange={e => setFormData({ ...formData, title: e.target.value })}
             className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
             placeholder="Enter document title"
           />
@@ -65,13 +65,11 @@ export default function UploadModal({
           </label>
           <select
             value={formData.category}
-            onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+            onChange={e => setFormData({ ...formData, category: e.target.value })}
             className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
           >
-            {allowedCategories.map((cat) => (
-              <option key={cat} value={cat}>
-                {cat}
-              </option>
+            {allowedCategories.map(cat => (
+              <option key={cat} value={cat}>{cat}</option>
             ))}
           </select>
         </div>
@@ -81,13 +79,11 @@ export default function UploadModal({
           </label>
           <select
             value={formData.event}
-            onChange={(e) => setFormData({ ...formData, event: e.target.value })}
+            onChange={e => setFormData({ ...formData, event: e.target.value })}
             className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
           >
-            {mockEvents.map((evt) => (
-              <option key={evt} value={evt}>
-                {evt}
-              </option>
+            {mockEvents.map(evt => (
+              <option key={evt} value={evt}>{evt}</option>
             ))}
           </select>
         </div>
@@ -97,31 +93,31 @@ export default function UploadModal({
           </label>
           <select
             value={formData.administration}
-            onChange={(e) => setFormData({ ...formData, administration: e.target.value })}
+            onChange={e => setFormData({ ...formData, administration: e.target.value })}
             className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
           >
-            {mockAdministrations.map((adm) => (
-              <option key={adm} value={adm}>
-                {adm}
-              </option>
+            {mockAdministrations.map(adm => (
+              <option key={adm} value={adm}>{adm}</option>
             ))}
           </select>
         </div>
         <div>
           <label className="block text-sm font-medium mb-2 text-gray-900 dark:text-white">
-            File
+            File <span className="text-gray-400 font-normal">(PDF or DOCX, max 10 MB)</span>
           </label>
           <input
             type="file"
-            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
             accept=".pdf,.docx"
+            onChange={e => setFile(e.target.files?.[0] ?? null)}
+            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
           />
+          {file && (
+            <p className="text-xs text-gray-500 mt-1">{file.name} ({(file.size / 1024).toFixed(0)} KB)</p>
+          )}
         </div>
         <div className="flex gap-2">
           <Button onClick={handleSubmit}>Upload</Button>
-          <Button onClick={onClose} variant="secondary">
-            Cancel
-          </Button>
+          <Button onClick={onClose} variant="secondary">Cancel</Button>
         </div>
       </div>
     </Modal>
