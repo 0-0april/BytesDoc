@@ -1,7 +1,8 @@
 'use client'
 
 import { Document } from '@/types'
-import { Download, Eye, Edit, Trash2, Archive } from 'lucide-react'
+import { Download, Eye, Edit, Trash2, Archive, FileText } from 'lucide-react'
+import EmptyState from '@/components/ui/EmptyState'
 
 interface DocumentTableProps {
   documents: Document[]
@@ -29,6 +30,18 @@ export default function DocumentTable({
   onArchive,
   uploaderNames = {},
 }: DocumentTableProps) {
+  if (documents.length === 0) {
+    return (
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
+        <EmptyState
+          icon={FileText}
+          title="No documents yet"
+          description="When documents are uploaded, they'll show up here."
+        />
+      </div>
+    )
+  }
+
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-x-auto">
       <table className="w-full">
@@ -45,7 +58,7 @@ export default function DocumentTable({
         </thead>
         <tbody>
           {documents.map((doc) => (
-            <tr key={doc.id} className="border-b dark:border-gray-700">
+            <tr key={doc.id} className="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
               <td className="py-3 px-4 text-gray-900 dark:text-white">{doc.title}</td>
               <td className="py-3 px-4 text-gray-600 dark:text-gray-400">{doc.category}</td>
               <td className="py-3 px-4 text-gray-600 dark:text-gray-400">{doc.event}</td>

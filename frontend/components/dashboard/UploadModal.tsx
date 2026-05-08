@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Modal from '@/components/ui/Modal'
 import Button from '@/components/ui/Button'
 import { mockCategories, mockEvents, mockAdministrations } from '@/lib/mockData'
+import { toast } from '@/lib/stores/toastStore'
 
 interface UploadModalProps {
   isOpen: boolean
@@ -11,7 +12,7 @@ interface UploadModalProps {
   onUpload: (
     data: { title: string; category: string; event: string; administration: string },
     file?: File | null
-  ) => void
+  ) => void | Promise<void>
   allowedCategories?: string[]
 }
 
@@ -28,20 +29,26 @@ export default function UploadModal({
     administration: '2024-2025',
   })
   const [file, setFile] = useState<File | null>(null)
+  const [isUploading, setIsUploading] = useState(false)
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!formData.title.trim()) {
-      alert('Please enter a title')
+      toast.error('Please enter a title')
       return
     }
-    onUpload(formData, file)
-    setFormData({
-      title: '',
-      category: allowedCategories[0] || 'Proposals',
-      event: 'Freshmen Orientation',
-      administration: '2024-2025',
-    })
-    setFile(null)
+    setIsUploading(true)
+    try {
+      await onUpload(formData, file)
+      setFormData({
+        title: '',
+        category: allowedCategories[0] || 'Proposals',
+        event: 'Freshmen Orientation',
+        administration: '2024-2025',
+      })
+      setFile(null)
+    } finally {
+      setIsUploading(false)
+    }
   }
 
   return (
@@ -116,8 +123,12 @@ export default function UploadModal({
           )}
         </div>
         <div className="flex gap-2">
-          <Button onClick={handleSubmit}>Upload</Button>
-          <Button onClick={onClose} variant="secondary">Cancel</Button>
+          <Button onClick={handleSubmit} isLoading={isUploading}>
+            {isUploading ? 'Uploading...' : 'Upload'}
+          </Button>
+          <Button onClick={onClose} variant="secondary" disabled={isUploading}>
+            Cancel
+          </Button>
         </div>
       </div>
     </Modal>

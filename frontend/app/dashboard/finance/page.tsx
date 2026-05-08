@@ -18,6 +18,8 @@ import UploadModal from '@/components/dashboard/UploadModal'
 import { FileText, DollarSign, Upload } from 'lucide-react'
 import { Document } from '@/types'
 import { mockEvents, mockAdministrations } from '@/lib/mockData'
+import { toast } from '@/lib/stores/toastStore'
+import { confirmDialog } from '@/lib/stores/confirmStore'
 
 export default function FinanceDashboard() {
   const router = useRouter()
@@ -92,8 +94,9 @@ export default function FinanceDashboard() {
         fileType: 'pdf',
       })
       setUploadModalOpen(false)
+      toast.success('Document uploaded')
     } catch (e: any) {
-      alert('Upload failed: ' + e.message)
+      toast.error('Upload failed: ' + e.message)
     }
   }
 
@@ -105,15 +108,22 @@ export default function FinanceDashboard() {
 
   const handleDownload = (doc: Document) => {
     addLog({ userId: user.id, action: 'download', documentId: doc.id })
-    alert('Download started: ' + doc.title)
+    toast.info('Download started: ' + doc.title)
   }
 
   const handleDelete = async (doc: Document) => {
-    if (!confirm(`Delete "${doc.title}"? This cannot be undone.`)) return
+    const ok = await confirmDialog({
+      title: 'Delete document?',
+      message: `"${doc.title}" will be permanently deleted. This cannot be undone.`,
+      confirmLabel: 'Delete',
+      variant: 'danger',
+    })
+    if (!ok) return
     try {
       await deleteDocument(doc.id)
+      toast.success('Document deleted')
     } catch (e: any) {
-      alert('Delete failed: ' + e.message)
+      toast.error('Delete failed: ' + e.message)
     }
   }
 
@@ -133,8 +143,9 @@ export default function FinanceDashboard() {
     try {
       await updateDocument(selectedDoc.id, editForm as any)
       setEditModalOpen(false)
+      toast.success('Document updated')
     } catch (e: any) {
-      alert('Update failed: ' + e.message)
+      toast.error('Update failed: ' + e.message)
     }
   }
 

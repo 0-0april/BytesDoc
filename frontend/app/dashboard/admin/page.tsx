@@ -22,6 +22,8 @@ import { FileText, Archive, Upload, Users, Activity, Download } from 'lucide-rea
 import { Document, User } from '@/types'
 import { apiGetDashboardStats, DashboardStats } from '@/lib/api'
 import { mockCategories, mockAdministrations } from '@/lib/mockData'
+import { toast } from '@/lib/stores/toastStore'
+import { confirmDialog } from '@/lib/stores/confirmStore'
 
 const TABS = [
   { name: 'Dashboard', href: '/dashboard/admin' },
@@ -155,8 +157,9 @@ export default function AdminDashboard() {
         fileType: 'pdf',
       })
       setUploadModalOpen(false)
+      toast.success('Document uploaded')
     } catch (e: any) {
-      alert('Upload failed: ' + e.message)
+      toast.error('Upload failed: ' + e.message)
     }
   }
 
@@ -170,7 +173,7 @@ export default function AdminDashboard() {
       const url = await getDownloadUrl(doc.id)
       window.open(url, '_blank')
     } catch {
-      alert('Download started: ' + doc.title)
+      toast.info('Download started: ' + doc.title)
     }
   }
 
@@ -185,43 +188,67 @@ export default function AdminDashboard() {
     try {
       await updateDocument(selectedDoc.id, editForm as any)
       setEditModalOpen(false)
+      toast.success('Document updated')
     } catch (e: any) {
-      alert('Update failed: ' + e.message)
+      toast.error('Update failed: ' + e.message)
     }
   }
 
   const handleDelete = async (doc: Document) => {
-    if (!confirm(`Delete "${doc.title}"? This cannot be undone.`)) return
+    const ok = await confirmDialog({
+      title: 'Delete document?',
+      message: `"${doc.title}" will be permanently deleted. This cannot be undone.`,
+      confirmLabel: 'Delete',
+      variant: 'danger',
+    })
+    if (!ok) return
     try {
       await deleteDocument(doc.id)
+      toast.success('Document deleted')
     } catch (e: any) {
-      alert('Delete failed: ' + e.message)
+      toast.error('Delete failed: ' + e.message)
     }
   }
 
   const handleArchive = async (doc: Document) => {
-    if (!confirm(`Archive "${doc.title}"? It will become read-only.`)) return
+    const ok = await confirmDialog({
+      title: 'Archive document?',
+      message: `"${doc.title}" will become read-only.`,
+      confirmLabel: 'Archive',
+    })
+    if (!ok) return
     try {
       await archiveDocument(doc.id)
+      toast.success('Document archived')
     } catch (e: any) {
-      alert('Archive failed: ' + e.message)
+      toast.error('Archive failed: ' + e.message)
     }
   }
 
   const handleBulkArchive = async (administration: string) => {
-    if (!confirm(`Archive ALL documents from administration "${administration}"?`)) return
+    const ok = await confirmDialog({
+      title: 'Bulk archive?',
+      message: `Archive ALL documents from administration "${administration}"?`,
+      confirmLabel: 'Archive all',
+    })
+    if (!ok) return
     try {
       await bulkArchiveByAdministration(administration)
+      toast.success(`Archived all docs from ${administration}`)
     } catch (e: any) {
-      alert('Bulk archive failed: ' + e.message)
+      toast.error('Bulk archive failed: ' + e.message)
     }
   }
 
   const handleInviteUser = () => {
-    if (!inviteForm.email || !inviteForm.fullName) { alert('Email and name are required'); return }
+    if (!inviteForm.email || !inviteForm.fullName) {
+      toast.error('Email and name are required')
+      return
+    }
     addUser({ email: inviteForm.email, fullName: inviteForm.fullName, role: inviteForm.role })
     setInviteForm({ email: '', fullName: '', role: 'member' })
     setInviteModalOpen(false)
+    toast.success('User invited')
   }
 
   const handleExportLogs = () => exportLogs({

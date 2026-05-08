@@ -13,6 +13,7 @@ import ArchiveList from '@/components/dashboard/ArchiveList'
 import DocumentViewerModal from '@/components/dashboard/DocumentViewerModal'
 import { FileText, Archive } from 'lucide-react'
 import { Document } from '@/types'
+import { toast } from '@/lib/stores/toastStore'
 
 export default function MemberDashboard() {
   const router = useRouter()
@@ -64,7 +65,7 @@ export default function MemberDashboard() {
 
   const handleDownload = (doc: Document) => {
     addLog({ userId: user.id, action: 'download', documentId: doc.id })
-    alert('Download started: ' + doc.title)
+    toast.info('Download started: ' + doc.title)
   }
 
   const totalDocs = documents.filter(d => !d.is_archived).length
