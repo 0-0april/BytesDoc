@@ -1,52 +1,81 @@
 import Link from 'next/link'
-import { FileText, Lock, Archive, Activity } from 'lucide-react'
+import Image from 'next/image'
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary via-accent to-primary dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
-      <div className="container mx-auto px-4 py-16">
-        <div className="text-center mb-16">
-          <h1 className="text-5xl md:text-6xl font-bold text-white mb-6">
+    <div className="relative min-h-screen w-full overflow-hidden bg-[#e5e5e5] flex items-center justify-center p-6 md:p-12">
+      
+      <div className="absolute inset-0 z-0">
+        <Image 
+          src="/graybg1.jpg" 
+          alt="Background" 
+          fill 
+          className="object-cover"
+          priority
+        />
+      </div>
+
+      <div className="absolute -left-32 md:-left-60 lg:-left-80 top-1/2 -translate-y-1/2 w-[80%] md:w-[65%] lg:w-[55%] opacity-90 pointer-events-none select-none z-10">
+        <Image 
+          src="/byteslogo1.png" 
+          alt="BYTES Logo Decorative" 
+          width={1200} 
+          height={1200} 
+          className="w-full h-auto drop-shadow-2xl"
+          priority 
+        />
+      </div>
+
+      <div className="relative z-20 w-full max-w-7xl flex flex-col items-end">
+        
+        <div className="text-right mb-12 lg:mb-20 pr-4 md:pr-12">
+          <h1 className="text-6xl md:text-8xl font-bold text-[#1a1a1a] tracking-tight uppercase leading-none">
             BytesDoc
           </h1>
-          <p className="text-xl md:text-2xl text-gray-200 mb-8">
-            Centralized Document Management for BYTES Student Council
+          <p className="text-lg md:text-2xl text-[#333] mt-4 font-medium max-w-md ml-auto">
+            Centralized Document Management for <br />
+            <span className="font-bold">BYTES Student Council</span>
           </p>
+          
           <Link
             href="/login"
-            className="inline-block bg-white text-primary px-8 py-3 rounded-lg font-semibold hover:bg-gray-100 transition"
+            className="inline-block mt-8 bg-[#333131] text-white px-14 py-4 rounded-xl text-lg font-bold hover:bg-black transition-all shadow-xl active:scale-95"
           >
-            Login
+            LOGIN
           </Link>
         </div>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8 max-w-6xl mx-auto">
-          <div className="bg-white/10 backdrop-blur-sm p-6 rounded-lg text-white">
-            <FileText className="w-12 h-12 mb-4" />
-            <h3 className="text-xl font-semibold mb-2">Secure Upload</h3>
-            <p className="text-gray-200">Upload and manage documents securely with role-based access control</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-2xl">
+          
+          <div className="bg-[#1e1e1ec2] backdrop-blur-md p-10 rounded-2xl text-white border border-white/10 shadow-2xl">
+            <h3 className="text-xl font-bold border-b border-gray-500 pb-2 mb-4">Secure Upload</h3>
+            <p className="text-sm text-gray-300 leading-relaxed">
+              Upload and manage documents securely with role-based access control.
+            </p>
           </div>
-          <div className="bg-white/10 backdrop-blur-sm p-6 rounded-lg text-white">
-            <Lock className="w-12 h-12 mb-4" />
-            <h3 className="text-xl font-semibold mb-2">Role-Based Access</h3>
-            <p className="text-gray-200">Different access levels for Chief Minister, Secretary, Finance, and Members</p>
-          </div>
-          <div className="bg-white/10 backdrop-blur-sm p-6 rounded-lg text-white">
-            <Archive className="w-12 h-12 mb-4" />
-            <h3 className="text-xl font-semibold mb-2">Document Archiving</h3>
-            <p className="text-gray-200">Archive past administration documents for long-term storage</p>
-          </div>
-          <div className="bg-white/10 backdrop-blur-sm p-6 rounded-lg text-white">
-            <Activity className="w-12 h-12 mb-4" />
-            <h3 className="text-xl font-semibold mb-2">Activity Logs</h3>
-            <p className="text-gray-200">Track all document activities with comprehensive audit logs</p>
-          </div>
-        </div>
 
-        <footer className="mt-24 text-center text-white">
-          <p className="mb-2">Contact: info@bytes.com</p>
-          <p>&copy; 2024 BYTES Student Council. All rights reserved.</p>
-        </footer>
+          <div className="bg-[#1e1e1ec2] backdrop-blur-md p-10 rounded-2xl text-white border border-white/10 shadow-2xl">
+            <h3 className="text-xl font-bold border-b border-gray-500 pb-2 mb-4">Role-based Access</h3>
+            <p className="text-sm text-gray-300 leading-relaxed">
+              Different access levels for Chief Minister, Secretary, Finance, and Members.
+            </p>
+          </div>
+
+          <div className="bg-[#1e1e1ec2] backdrop-blur-md p-10 rounded-2xl text-white border border-white/10 shadow-2xl">
+            <h3 className="text-xl font-bold border-b border-gray-500 pb-2 mb-4">Document Archiving</h3>
+            <p className="text-sm text-gray-300 leading-relaxed">
+              Archive past administration documents for long-term storage and retrieval.
+            </p>
+          </div>
+
+          <div className="bg-[#1e1e1ec2] backdrop-blur-md p-10 rounded-2xl text-white border border-white/10 shadow-2xl">
+            <h3 className="text-xl font-bold border-b border-gray-500 pb-2 mb-4">Activity Logs</h3>
+            <p className="text-sm text-gray-300 leading-relaxed">
+              Track all document activities with comprehensive audit logs and alerts.
+            </p>
+          </div>
+          
+        </div>
       </div>
     </div>
   )
