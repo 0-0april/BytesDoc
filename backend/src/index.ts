@@ -5,6 +5,10 @@ import helmet from 'helmet'
 import healthRouter from './routes/health'
 import authRouter from './routes/auth'
 import documentsRouter from './routes/documents'
+import usersRouter from './routes/users'
+import activityLogsRouter from './routes/activitylogs'
+import dashboardRouter from './routes/dashboard'
+import archiveRouter from './routes/archive'
 import { errorHandler } from './middleware/error'
 
 const app = express()
@@ -18,6 +22,10 @@ app.use(express.json({ limit: '10mb' }))
 app.use('/api', healthRouter)
 app.use('/api/auth', authRouter)
 app.use('/api/documents', documentsRouter)
+app.use('/api/documents', archiveRouter)   // archive sub-routes on /api/documents/:id/archive
+app.use('/api/users', usersRouter)
+app.use('/api/activity-logs', activityLogsRouter)
+app.use('/api/dashboard', dashboardRouter)
 
 app.use(errorHandler)
 
