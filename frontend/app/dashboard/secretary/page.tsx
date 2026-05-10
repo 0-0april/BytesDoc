@@ -9,6 +9,7 @@ import { useActivityStore } from '@/lib/stores/activityStore'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import Card from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
+import Modal from '@/components/ui/Modal'
 import BarChart from '@/components/charts/BarChart'
 import DocumentTable from '@/components/dashboard/DocumentTable'
 import ArchiveList from '@/components/dashboard/ArchiveList'
@@ -16,27 +17,33 @@ import DocumentViewerModal from '@/components/dashboard/DocumentViewerModal'
 import UploadModal from '@/components/dashboard/UploadModal'
 import { FileText, Archive, Upload } from 'lucide-react'
 import { Document } from '@/types'
+import { mockEvents, mockAdministrations } from '@/lib/mockData'
 
 export default function SecretaryDashboard() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const tab = searchParams.get('tab') || 'dashboard'
   
-  const { user, isAuthenticated } = useAuthStore()
+  const { user, isAuthenticated, hasHydrated } = useAuthStore()
   const { documents, addDocument, updateDocument, deleteDocument } = useDocumentStore()
   const { users } = useUserStore()
   const { addLog } = useActivityStore()
 
+  const SECRETARY_CATEGORIES = ['Proposals', 'Permits', 'Reports'] as const
+
   const [searchTerm, setSearchTerm] = useState('')
   const [uploadModalOpen, setUploadModalOpen] = useState(false)
   const [viewModalOpen, setViewModalOpen] = useState(false)
+  const [editModalOpen, setEditModalOpen] = useState(false)
   const [selectedDoc, setSelectedDoc] = useState<Document | null>(null)
+  const [editForm, setEditForm] = useState({ title: '', category: '', event: '', administration: '' })
 
   useEffect(() => {
+    if (!hasHydrated) return
     if (!isAuthenticated || user?.role !== 'secretary') {
       router.push('/login')
     }
-  }, [isAuthenticated, user, router])
+  }, [hasHydrated, isAuthenticated, user, router])
 
   if (!user) return null
 
@@ -62,19 +69,30 @@ export default function SecretaryDashboard() {
     return d.is_archived
   })
 
-  const handleUpload = (data: any) => {
-    addDocument({
-      ...data,
-      uploadedBy: user.id,
-      uploadDate: new Date().toISOString(),
-      filePath: '/mock/document.pdf',
-      is_archived: false,
-      is_locked: false,
-      fileType: 'pdf',
-      category: data.category as any,
-    })
-    addLog({ userId: user.id, action: 'upload', documentId: `${Date.now()}` })
-    setUploadModalOpen(false)
+  const handleUpload = async (
+    data: { title: string; category: string; event: string; administration: string },
+    file?: File | null
+  ) => {
+    try {
+      await addDocument(file ?? null, {
+        ...data,
+        fileType: file?.name.endsWith('.docx') ? 'docx' : 'pdf',
+      }, {
+        title: data.title,
+        category: data.category as Document['category'],
+        event: data.event,
+        administration: data.administration,
+        uploadedBy: user.id,
+        uploadDate: new Date().toISOString(),
+        filePath: '/mock/document.pdf',
+        is_archived: false,
+        is_locked: false,
+        fileType: 'pdf',
+      })
+      setUploadModalOpen(false)
+    } catch (e: any) {
+      alert('Upload failed: ' + e.message)
+    }
   }
 
   const handleView = (doc: Document) => {
@@ -88,10 +106,33 @@ export default function SecretaryDashboard() {
     alert('Download started: ' + doc.title)
   }
 
-  const handleDelete = (doc: Document) => {
-    if (confirm('Delete this document?')) {
-      deleteDocument(doc.id)
-      addLog({ userId: user.id, action: 'archive', documentId: doc.id })
+  const handleDelete = async (doc: Document) => {
+    if (!confirm(`Delete "${doc.title}"? This cannot be undone.`)) return
+    try {
+      await deleteDocument(doc.id)
+    } catch (e: any) {
+      alert('Delete failed: ' + e.message)
+    }
+  }
+
+  const handleEditOpen = (doc: Document) => {
+    setSelectedDoc(doc)
+    setEditForm({
+      title: doc.title,
+      category: doc.category,
+      event: doc.event,
+      administration: doc.administration,
+    })
+    setEditModalOpen(true)
+  }
+
+  const handleEditSave = async () => {
+    if (!selectedDoc) return
+    try {
+      await updateDocument(selectedDoc.id, editForm as any)
+      setEditModalOpen(false)
+    } catch (e: any) {
+      alert('Update failed: ' + e.message)
     }
   }
 
@@ -178,7 +219,7 @@ export default function SecretaryDashboard() {
             canArchive={false}
             onView={handleView}
             onDownload={handleDownload}
-            onEdit={(doc) => {}}
+            onEdit={handleEditOpen}
             onDelete={handleDelete}
             uploaderNames={uploaderNames}
           />
@@ -209,6 +250,54 @@ export default function SecretaryDashboard() {
         onClose={() => setViewModalOpen(false)}
         document={selectedDoc}
       />
+
+      <Modal isOpen={editModalOpen} onClose={() => setEditModalOpen(false)} title="Edit Document">
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-1 text-gray-900 dark:text-white">Title</label>
+            <input
+              type="text"
+              value={editForm.title}
+              onChange={e => setEditForm({ ...editForm, title: e.target.value })}
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1 text-gray-900 dark:text-white">Category</label>
+            <select
+              value={editForm.category}
+              onChange={e => setEditForm({ ...editForm, category: e.target.value })}
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+            >
+              {SECRETARY_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1 text-gray-900 dark:text-white">Event</label>
+            <select
+              value={editForm.event}
+              onChange={e => setEditForm({ ...editForm, event: e.target.value })}
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+            >
+              {mockEvents.map(evt => <option key={evt} value={evt}>{evt}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1 text-gray-900 dark:text-white">Administration</label>
+            <select
+              value={editForm.administration}
+              onChange={e => setEditForm({ ...editForm, administration: e.target.value })}
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+            >
+              {mockAdministrations.map(adm => <option key={adm} value={adm}>{adm}</option>)}
+            </select>
+          </div>
+          <div className="flex gap-2">
+            <Button onClick={handleEditSave}>Save Changes</Button>
+            <Button onClick={() => setEditModalOpen(false)} variant="secondary">Cancel</Button>
+          </div>
+        </div>
+      </Modal>
     </DashboardLayout>
   )
 }

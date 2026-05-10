@@ -29,7 +29,7 @@ export const useUserStore = create<UserState>((set, get) => ({
       const users = await apiGetUsers()
       set({ users, loading: false })
     } catch {
-      set({ users: mockUsers, loading: false })
+      set({ users: [], loading: false })
     }
   },
 
