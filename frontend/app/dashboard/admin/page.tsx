@@ -22,6 +22,8 @@ import { FileText, Archive, Upload, Users, Activity, Download } from 'lucide-rea
 import { Document, User } from '@/types'
 import { apiGetDashboardStats, DashboardStats } from '@/lib/api'
 import { mockCategories, mockAdministrations } from '@/lib/mockData'
+import { toast } from '@/lib/stores/toastStore'
+import { confirmDialog } from '@/lib/stores/confirmStore'
 
 const TABS = [
   { name: 'Dashboard', href: '/dashboard/admin' },
@@ -45,9 +47,12 @@ export default function AdminDashboard() {
     deleteDocument,
     archiveDocument,
     bulkArchiveByAdministration,
+    lockDocument,
+    unlockDocument,
+    bulkLockByAdministration,
     getDownloadUrl,
   } = useDocumentStore()
-  const { users, fetchUsers, updateUserRole, addUser } = useUserStore()
+  const { users, fetchUsers, updateUserRole, inviteUser } = useUserStore()
   const { logs, remoteLogs, fetchLogs, exportLogs } = useActivityStore()
 
   // ── Local UI state ──────────────────────────────────────────────────────
@@ -63,6 +68,7 @@ export default function AdminDashboard() {
   const [filterUser, setFilterUser] = useState('All')
   const [filterAction, setFilterAction] = useState('All')
   const [stats, setStats] = useState<DashboardStats | null>(null)
+  const [isInviting, setIsInviting] = useState(false)
 
   // ── Auth guard ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -155,8 +161,9 @@ export default function AdminDashboard() {
         fileType: 'pdf',
       })
       setUploadModalOpen(false)
+      toast.success('Document uploaded')
     } catch (e: any) {
-      alert('Upload failed: ' + e.message)
+      toast.error('Upload failed: ' + e.message)
     }
   }
 
@@ -170,7 +177,7 @@ export default function AdminDashboard() {
       const url = await getDownloadUrl(doc.id)
       window.open(url, '_blank')
     } catch {
-      alert('Download started: ' + doc.title)
+      toast.info('Download started: ' + doc.title)
     }
   }
 
@@ -185,43 +192,124 @@ export default function AdminDashboard() {
     try {
       await updateDocument(selectedDoc.id, editForm as any)
       setEditModalOpen(false)
+      toast.success('Document updated')
     } catch (e: any) {
-      alert('Update failed: ' + e.message)
+      toast.error('Update failed: ' + e.message)
     }
   }
 
   const handleDelete = async (doc: Document) => {
-    if (!confirm(`Delete "${doc.title}"? This cannot be undone.`)) return
+    const ok = await confirmDialog({
+      title: 'Delete document?',
+      message: `"${doc.title}" will be permanently deleted. This cannot be undone.`,
+      confirmLabel: 'Delete',
+      variant: 'danger',
+    })
+    if (!ok) return
     try {
       await deleteDocument(doc.id)
+      toast.success('Document deleted')
     } catch (e: any) {
-      alert('Delete failed: ' + e.message)
+      toast.error('Delete failed: ' + e.message)
     }
   }
 
   const handleArchive = async (doc: Document) => {
-    if (!confirm(`Archive "${doc.title}"? It will become read-only.`)) return
+    const ok = await confirmDialog({
+      title: 'Archive document?',
+      message: `"${doc.title}" will become read-only.`,
+      confirmLabel: 'Archive',
+    })
+    if (!ok) return
     try {
       await archiveDocument(doc.id)
+      toast.success('Document archived')
     } catch (e: any) {
-      alert('Archive failed: ' + e.message)
+      toast.error('Archive failed: ' + e.message)
     }
   }
 
   const handleBulkArchive = async (administration: string) => {
-    if (!confirm(`Archive ALL documents from administration "${administration}"?`)) return
+    const ok = await confirmDialog({
+      title: 'Bulk archive?',
+      message: `Archive ALL documents from administration "${administration}"?`,
+      confirmLabel: 'Archive all',
+    })
+    if (!ok) return
     try {
       await bulkArchiveByAdministration(administration)
+      toast.success(`Archived all docs from ${administration}`)
     } catch (e: any) {
-      alert('Bulk archive failed: ' + e.message)
+      toast.error('Bulk archive failed: ' + e.message)
     }
   }
 
-  const handleInviteUser = () => {
-    if (!inviteForm.email || !inviteForm.fullName) { alert('Email and name are required'); return }
-    addUser({ email: inviteForm.email, fullName: inviteForm.fullName, role: inviteForm.role })
-    setInviteForm({ email: '', fullName: '', role: 'member' })
-    setInviteModalOpen(false)
+  const handleLock = async (doc: Document) => {
+    const ok = await confirmDialog({
+      title: 'Lock document?',
+      message: `"${doc.title}" will become read-only until unlocked.`,
+      confirmLabel: 'Lock',
+    })
+    if (!ok) return
+    try {
+      await lockDocument(doc.id)
+      toast.success('Document locked')
+    } catch (e: any) {
+      toast.error('Lock failed: ' + e.message)
+    }
+  }
+
+  const handleUnlock = async (doc: Document) => {
+    const ok = await confirmDialog({
+      title: 'Unlock document?',
+      message: `"${doc.title}" will become editable again.`,
+      confirmLabel: 'Unlock',
+    })
+    if (!ok) return
+    try {
+      await unlockDocument(doc.id)
+      toast.success('Document unlocked')
+    } catch (e: any) {
+      toast.error('Unlock failed: ' + e.message)
+    }
+  }
+
+  const handleBulkLock = async (administration: string) => {
+    const ok = await confirmDialog({
+      title: 'Bulk lock?',
+      message: `Lock ALL active documents from administration "${administration}"?`,
+      confirmLabel: 'Lock all',
+    })
+    if (!ok) return
+    try {
+      await bulkLockByAdministration(administration)
+      toast.success(`Locked all active docs from ${administration}`)
+    } catch (e: any) {
+      toast.error('Bulk lock failed: ' + e.message)
+    }
+  }
+
+  const handleInviteUser = async () => {
+    if (!inviteForm.email || !inviteForm.fullName) {
+      toast.error('Email and name are required')
+      return
+    }
+    setIsInviting(true)
+    try {
+      await inviteUser({
+        email: inviteForm.email,
+        fullName: inviteForm.fullName,
+        role: inviteForm.role,
+      })
+      const target = inviteForm.email
+      setInviteForm({ email: '', fullName: '', role: 'member' })
+      setInviteModalOpen(false)
+      toast.success(usingMock ? 'User added (demo mode)' : `Invite email sent to ${target}`)
+    } catch (e: any) {
+      toast.error(e?.message ?? 'Invite failed')
+    } finally {
+      setIsInviting(false)
+    }
   }
 
   const handleExportLogs = () => exportLogs({
@@ -349,17 +437,46 @@ export default function AdminDashboard() {
             </div>
           </div>
 
+          {(() => {
+            const lockableAdmins = [...new Set(activeDocs.filter(d => !d.is_locked).map(d => d.administration))]
+            if (lockableAdmins.length === 0) return null
+            return (
+              <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
+                  Bulk Lock by Administration
+                </h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                  Marks every active (non-archived) document for the selected administration as read-only.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {lockableAdmins.map(admin => (
+                    <Button
+                      key={admin}
+                      onClick={() => handleBulkLock(admin)}
+                      variant="secondary"
+                    >
+                      Lock All from {admin}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )
+          })()}
+
           <DocumentTable
             documents={filteredActiveDocs}
             canUpload={true}
             canEdit={() => true}
             canDelete={() => true}
             canArchive={true}
+            canLock={() => true}
             onView={handleView}
             onDownload={handleDownload}
             onEdit={handleEditOpen}
             onDelete={handleDelete}
             onArchive={handleArchive}
+            onLock={handleLock}
+            onUnlock={handleUnlock}
             uploaderNames={uploaderNames}
           />
         </div>
@@ -485,7 +602,9 @@ export default function AdminDashboard() {
       <Modal isOpen={inviteModalOpen} onClose={() => setInviteModalOpen(false)} title="Invite New User">
         <div className="space-y-4">
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            Note: In production, this creates a Supabase auth invite. In demo mode, it adds to local state only.
+            {usingMock
+              ? 'Demo mode: this adds the user to local state only. No email is sent.'
+              : 'An invite email will be sent to this address. The recipient sets their password from the link, then logs in here.'}
           </p>
           <div>
             <label className="block text-sm font-medium mb-1 text-gray-900 dark:text-white">Email</label>
@@ -519,8 +638,12 @@ export default function AdminDashboard() {
             </select>
           </div>
           <div className="flex gap-2">
-            <Button onClick={handleInviteUser}>Invite</Button>
-            <Button onClick={() => setInviteModalOpen(false)} variant="secondary">Cancel</Button>
+            <Button onClick={handleInviteUser} isLoading={isInviting}>
+              {isInviting ? 'Sending...' : 'Send Invite'}
+            </Button>
+            <Button onClick={() => setInviteModalOpen(false)} variant="secondary" disabled={isInviting}>
+              Cancel
+            </Button>
           </div>
         </div>
       </Modal>

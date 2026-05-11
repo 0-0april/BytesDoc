@@ -2,14 +2,14 @@
 import { create } from 'zustand'
 import { User } from '@/types'
 import { mockUsers } from '@/lib/mockData'
-import { apiGetUsers, apiUpdateUserRole } from '@/lib/api'
+import { apiGetUsers, apiInviteUser, apiUpdateUserRole } from '@/lib/api'
 import { useAuthStore } from './authStore'
 
 interface UserState {
   users: User[]
   loading: boolean
   fetchUsers: () => Promise<void>
-  addUser: (user: Omit<User, 'id' | 'createdAt'>) => void          // mock-only (invite flow needs Supabase auth)
+  inviteUser: (input: { email: string; fullName: string; role: User['role'] }) => Promise<User>
   updateUserRole: (id: string, role: User['role']) => Promise<void>
 }
 
@@ -33,13 +33,28 @@ export const useUserStore = create<UserState>((set, get) => ({
     }
   },
 
-  addUser: (user) =>
-    set(state => ({
-      users: [
-        ...state.users,
-        { ...user, id: `${Date.now()}`, createdAt: new Date().toISOString() },
-      ],
-    })),
+  inviteUser: async (input) => {
+    const { usingMock } = useAuthStore.getState()
+    if (usingMock) {
+      const fake: User = {
+        id: `${Date.now()}`,
+        email: input.email,
+        fullName: input.fullName,
+        role: input.role,
+        createdAt: new Date().toISOString(),
+      }
+      set(state => ({ users: [...state.users, fake] }))
+      return fake
+    }
+
+    const newUser = await apiInviteUser({
+      email: input.email,
+      name: input.fullName,
+      role: input.role,
+    })
+    set(state => ({ users: [...state.users, newUser] }))
+    return newUser
+  },
 
   updateUserRole: async (id, role) => {
     const { usingMock } = useAuthStore.getState()

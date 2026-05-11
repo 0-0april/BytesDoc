@@ -25,7 +25,7 @@ export interface Document {
 export interface ActivityLog {
   id: string
   userId: string
-  action: 'upload' | 'download' | 'view' | 'archive' | 'login'
+  action: 'upload' | 'download' | 'view' | 'archive' | 'lock' | 'unlock' | 'login'
   documentId?: string
   timestamp: string
 }

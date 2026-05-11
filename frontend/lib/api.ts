@@ -138,14 +138,30 @@ export async function apiBulkArchive(administration: string) {
   })
 }
 
+// ─── Lock ───────────────────────────────────────────────────────────────────
+
+export async function apiLockDocument(id: string) {
+  return apiFetch<{ ok: boolean }>(`/documents/${id}/lock`, { method: 'POST' })
+}
+
+export async function apiUnlockDocument(id: string) {
+  return apiFetch<{ ok: boolean }>(`/documents/${id}/unlock`, { method: 'POST' })
+}
+
+export async function apiBulkLock(administration: string) {
+  return apiFetch<{ ok: boolean; lockedCount: number }>('/documents/bulk-lock', {
+    method: 'POST',
+    body: JSON.stringify({ administration }),
+  })
+}
+
 // ─── Users ──────────────────────────────────────────────────────────────────
 
 export async function apiGetUsers() {
   return apiFetch<import('@/types').User[]>('/users')
 }
 
-export async function apiCreateUser(payload: {
-  id: string
+export async function apiInviteUser(payload: {
   email: string
   name: string
   role: import('@/types').Role

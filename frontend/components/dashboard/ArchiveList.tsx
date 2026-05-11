@@ -1,8 +1,9 @@
 'use client'
 
 import { Document } from '@/types'
-import { Download, Eye } from 'lucide-react'
+import { Download, Eye, Archive } from 'lucide-react'
 import Button from '@/components/ui/Button'
+import EmptyState from '@/components/ui/EmptyState'
 
 interface ArchiveListProps {
   documents: Document[]
@@ -45,6 +46,13 @@ export default function ArchiveList({
       )}
 
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-x-auto">
+        {documents.length === 0 ? (
+          <EmptyState
+            icon={Archive}
+            title="No archived documents"
+            description="Documents that get archived will appear here."
+          />
+        ) : (
         <table className="w-full">
           <thead>
             <tr className="border-b dark:border-gray-700">
@@ -58,7 +66,7 @@ export default function ArchiveList({
           </thead>
           <tbody>
             {documents.map((doc) => (
-              <tr key={doc.id} className="border-b dark:border-gray-700">
+              <tr key={doc.id} className="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                 <td className="py-3 px-4 text-gray-900 dark:text-white">{doc.title}</td>
                 <td className="py-3 px-4 text-gray-600 dark:text-gray-400">{doc.category}</td>
                 <td className="py-3 px-4 text-gray-600 dark:text-gray-400">{doc.administration}</td>
@@ -90,6 +98,7 @@ export default function ArchiveList({
             ))}
           </tbody>
         </table>
+        )}
       </div>
     </div>
   )
