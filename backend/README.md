@@ -140,12 +140,38 @@ backend/
 | PUT    | `/api/documents/:id`           | yes | uploader OR chief_minister                         | edit metadata; 409 if archived/locked |
 | DELETE | `/api/documents/:id`           | yes | uploader OR chief_minister                         | hard delete (DB + storage); 409 if archived |
 | GET    | `/api/documents/:id/download`  | yes | any (filtered by role)                             | returns 60s signed URL; logs `download` |
+| POST   | `/api/documents/:id/archive`   | yes | chief_minister                                     | sets `is_archived` + `is_locked` true; 409 if already archived; logs `archive` |
+| POST   | `/api/documents/archive-bulk`  | yes | chief_minister                                     | body `{ administration }`; archives all unarchived docs for that term; returns `{ administration, archivedCount, archivedIds }`; logs `archive` per doc |
 
 ### Planned
 
-- `POST /api/documents/:id/archive` + bulk archive by administration term — `feature/backend-documents-archive`
-- `GET|POST /api/users`, `PUT /api/users/:id/role` — `feature/backend-users`
-- `GET /api/activity-logs`, `GET /api/activity-logs/export` — `feature/backend-activity-logs`
+#### Users management — `feature/backend-users`
+
+- `GET /api/users` — list all users (id, email, name, role, created_at). Chief minister only.
+- `POST /api/users` — invite a new user. Body: `{ email, name, role }`. Creates the account in Supabase Auth (`supabase.auth.admin.createUser`) and inserts a matching row in `public.users` with the chosen role. Chief minister only.
+- `PUT /api/users/:id/role` — change a user's role. Body: `{ role }`. Chief minister only. Per the spec there is no delete-user endpoint.
+
+#### Activity logs — `feature/backend-activity-logs`
+
+- `GET /api/activity-logs` — list log entries with optional filters: `?user=`, `?action=`, `?from=`, `?to=` (date range). Returns user, action, related document, timestamp. Chief minister only.
+- `GET /api/activity-logs/export` — same filters as above but returns a CSV file (`Content-Type: text/csv`) so the chief's "Export to CSV" button can save it.
+
+#### Dashboard stats — `feature/backend-dashboard`
+
+One endpoint that powers the dashboard cards and charts so the frontend doesn't have to download every document and count client-side:
+
+- `GET /api/dashboard` — returns role-specific stats:
+  - counts: total documents, active (non-archived), archived, uploads in the last 7 days
+  - per-category counts (bar chart)
+  - uploads grouped by month for the last 6 months (line chart)
+  - 5 most recent documents the user has access to
+
+Chief sees everything; finance sees finance-related numbers only; secretary sees their accessible categories; member sees read-only counts.
+
+### Outside the API itself
+
+- **Frontend → backend wiring.** The frontend currently reads from `frontend/lib/mockData.ts` and never makes a real HTTP request. After the API is stable someone needs to replace the mock calls with `fetch` to `http://localhost:4000/api/...`, save the JWT returned by login (Zustand store or localStorage), and attach `Authorization: Bearer <token>` to every authenticated request. Mostly frontend work.
+- **Hosting.** The API only runs on `localhost:4000` right now. To share with the team or hand it to the frontend lead, deploy it somewhere public — Render, Railway, and Fly.io all have free tiers. Same env vars, just set on the host instead of in `.env`.
 
 ### Role-based document visibility
 
