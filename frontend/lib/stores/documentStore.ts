@@ -9,6 +9,9 @@ import {
   apiDeleteDocument,
   apiArchiveDocument,
   apiBulkArchive,
+  apiLockDocument,
+  apiUnlockDocument,
+  apiBulkLock,
   apiDownloadDocument,
   DocumentsQuery,
 } from '@/lib/api'
@@ -29,6 +32,9 @@ interface DocumentState {
   deleteDocument: (id: string) => Promise<void>
   archiveDocument: (id: string) => Promise<void>
   bulkArchiveByAdministration: (administration: string) => Promise<void>
+  lockDocument: (id: string) => Promise<void>
+  unlockDocument: (id: string) => Promise<void>
+  bulkLockByAdministration: (administration: string) => Promise<void>
   getDownloadUrl: (id: string) => Promise<string>
 }
 
@@ -144,6 +150,59 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
 
     try {
       await apiBulkArchive(administration)
+    } catch (e: any) {
+      await get().fetchDocuments()
+      throw e
+    }
+  },
+
+  lockDocument: async (id) => {
+    const { usingMock } = useAuthStore.getState()
+    set(state => ({
+      documents: state.documents.map(d =>
+        d.id === id ? { ...d, is_locked: true } : d
+      ),
+    }))
+    if (usingMock) return
+
+    try {
+      await apiLockDocument(id)
+    } catch (e: any) {
+      await get().fetchDocuments()
+      throw e
+    }
+  },
+
+  unlockDocument: async (id) => {
+    const { usingMock } = useAuthStore.getState()
+    set(state => ({
+      documents: state.documents.map(d =>
+        d.id === id ? { ...d, is_locked: false } : d
+      ),
+    }))
+    if (usingMock) return
+
+    try {
+      await apiUnlockDocument(id)
+    } catch (e: any) {
+      await get().fetchDocuments()
+      throw e
+    }
+  },
+
+  bulkLockByAdministration: async (administration) => {
+    const { usingMock } = useAuthStore.getState()
+    set(state => ({
+      documents: state.documents.map(d =>
+        d.administration === administration && !d.is_archived
+          ? { ...d, is_locked: true }
+          : d
+      ),
+    }))
+    if (usingMock) return
+
+    try {
+      await apiBulkLock(administration)
     } catch (e: any) {
       await get().fetchDocuments()
       throw e

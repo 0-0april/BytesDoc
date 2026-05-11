@@ -39,14 +39,15 @@ router.get('/', requireAuth, requireRole('chief_minister'), async (_req, res, ne
   }
 })
 
-// POST /api/users — invite/create a new user profile row (chief_minister only)
-// Assumes the Supabase auth user already exists (created via Supabase dashboard or
-// a separate invite flow). This just upserts the public.users profile row.
+// POST /api/users — send invite email via Supabase Auth and create profile row (chief_minister only)
+// The recipient gets an email with a link to set their password; on click, Supabase Auth
+// confirms the account. The public.users row is pre-created so the user appears in the list
+// immediately (with role pre-assigned) regardless of whether they've accepted yet.
 router.post('/', requireAuth, requireRole('chief_minister'), async (req, res, next) => {
   try {
-    const { id, email, name, role } = req.body ?? {}
-    if (!id || !email || !name || !role) {
-      return res.status(400).json({ error: 'id, email, name, role are required' })
+    const { email, name, role } = req.body ?? {}
+    if (!email || !name || !role) {
+      return res.status(400).json({ error: 'email, name, role are required' })
     }
 
     const VALID_ROLES: Role[] = ['chief_minister', 'secretary', 'finance_minister', 'member']
@@ -54,7 +55,7 @@ router.post('/', requireAuth, requireRole('chief_minister'), async (req, res, ne
       return res.status(400).json({ error: `role must be one of ${VALID_ROLES.join(', ')}` })
     }
 
-    // Resolve role_id
+    // Resolve role_id up-front so we don't send an email if the role lookup fails
     const { data: roleRow, error: roleErr } = await supabase
       .from('roles')
       .select('id')
@@ -65,15 +66,34 @@ router.post('/', requireAuth, requireRole('chief_minister'), async (req, res, ne
       return res.status(500).json({ error: 'could not resolve role' })
     }
 
+    // Send the invite email — creates an auth.users row in "invited" state
+    const redirectTo = (process.env.FRONTEND_URL || 'http://localhost:3000') + '/login'
+    const { data: inviteData, error: inviteErr } = await supabase.auth.admin.inviteUserByEmail(
+      email,
+      { data: { name, role }, redirectTo }
+    )
+
+    if (inviteErr || !inviteData?.user) {
+      const msg = inviteErr?.message ?? 'could not send invite'
+      if (msg.toLowerCase().includes('already')) {
+        return res.status(409).json({ error: 'a user with this email already exists' })
+      }
+      return res.status(500).json({ error: msg })
+    }
+
+    const newUserId = inviteData.user.id
+
+    // Insert profile row using the auth user's ID; roll back the auth user on failure
     const { data, error } = await supabase
       .from('users')
-      .insert({ id, email, name, role_id: roleRow.id })
+      .insert({ id: newUserId, email, name, role_id: roleRow.id })
       .select('id, email, name, role:roles(role_name), created_at')
       .single<ProfileRow>()
 
-    if (error) {
-      if (error.code === '23505') return res.status(409).json({ error: 'user already exists' })
-      return res.status(500).json({ error: error.message })
+    if (error || !data) {
+      await supabase.auth.admin.deleteUser(newUserId).catch(() => {})
+      if (error?.code === '23505') return res.status(409).json({ error: 'user profile already exists' })
+      return res.status(500).json({ error: error?.message ?? 'profile creation failed' })
     }
 
     res.status(201).json(toUser(data))

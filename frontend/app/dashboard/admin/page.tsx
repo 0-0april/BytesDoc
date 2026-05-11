@@ -47,9 +47,12 @@ export default function AdminDashboard() {
     deleteDocument,
     archiveDocument,
     bulkArchiveByAdministration,
+    lockDocument,
+    unlockDocument,
+    bulkLockByAdministration,
     getDownloadUrl,
   } = useDocumentStore()
-  const { users, fetchUsers, updateUserRole, addUser } = useUserStore()
+  const { users, fetchUsers, updateUserRole, inviteUser } = useUserStore()
   const { logs, remoteLogs, fetchLogs, exportLogs } = useActivityStore()
 
   // ── Local UI state ──────────────────────────────────────────────────────
@@ -65,6 +68,7 @@ export default function AdminDashboard() {
   const [filterUser, setFilterUser] = useState('All')
   const [filterAction, setFilterAction] = useState('All')
   const [stats, setStats] = useState<DashboardStats | null>(null)
+  const [isInviting, setIsInviting] = useState(false)
 
   // ── Auth guard ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -240,15 +244,72 @@ export default function AdminDashboard() {
     }
   }
 
-  const handleInviteUser = () => {
+  const handleLock = async (doc: Document) => {
+    const ok = await confirmDialog({
+      title: 'Lock document?',
+      message: `"${doc.title}" will become read-only until unlocked.`,
+      confirmLabel: 'Lock',
+    })
+    if (!ok) return
+    try {
+      await lockDocument(doc.id)
+      toast.success('Document locked')
+    } catch (e: any) {
+      toast.error('Lock failed: ' + e.message)
+    }
+  }
+
+  const handleUnlock = async (doc: Document) => {
+    const ok = await confirmDialog({
+      title: 'Unlock document?',
+      message: `"${doc.title}" will become editable again.`,
+      confirmLabel: 'Unlock',
+    })
+    if (!ok) return
+    try {
+      await unlockDocument(doc.id)
+      toast.success('Document unlocked')
+    } catch (e: any) {
+      toast.error('Unlock failed: ' + e.message)
+    }
+  }
+
+  const handleBulkLock = async (administration: string) => {
+    const ok = await confirmDialog({
+      title: 'Bulk lock?',
+      message: `Lock ALL active documents from administration "${administration}"?`,
+      confirmLabel: 'Lock all',
+    })
+    if (!ok) return
+    try {
+      await bulkLockByAdministration(administration)
+      toast.success(`Locked all active docs from ${administration}`)
+    } catch (e: any) {
+      toast.error('Bulk lock failed: ' + e.message)
+    }
+  }
+
+  const handleInviteUser = async () => {
     if (!inviteForm.email || !inviteForm.fullName) {
       toast.error('Email and name are required')
       return
     }
-    addUser({ email: inviteForm.email, fullName: inviteForm.fullName, role: inviteForm.role })
-    setInviteForm({ email: '', fullName: '', role: 'member' })
-    setInviteModalOpen(false)
-    toast.success('User invited')
+    setIsInviting(true)
+    try {
+      await inviteUser({
+        email: inviteForm.email,
+        fullName: inviteForm.fullName,
+        role: inviteForm.role,
+      })
+      const target = inviteForm.email
+      setInviteForm({ email: '', fullName: '', role: 'member' })
+      setInviteModalOpen(false)
+      toast.success(usingMock ? 'User added (demo mode)' : `Invite email sent to ${target}`)
+    } catch (e: any) {
+      toast.error(e?.message ?? 'Invite failed')
+    } finally {
+      setIsInviting(false)
+    }
   }
 
   const handleExportLogs = () => exportLogs({
@@ -376,17 +437,46 @@ export default function AdminDashboard() {
             </div>
           </div>
 
+          {(() => {
+            const lockableAdmins = [...new Set(activeDocs.filter(d => !d.is_locked).map(d => d.administration))]
+            if (lockableAdmins.length === 0) return null
+            return (
+              <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
+                  Bulk Lock by Administration
+                </h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                  Marks every active (non-archived) document for the selected administration as read-only.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {lockableAdmins.map(admin => (
+                    <Button
+                      key={admin}
+                      onClick={() => handleBulkLock(admin)}
+                      variant="secondary"
+                    >
+                      Lock All from {admin}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )
+          })()}
+
           <DocumentTable
             documents={filteredActiveDocs}
             canUpload={true}
             canEdit={() => true}
             canDelete={() => true}
             canArchive={true}
+            canLock={() => true}
             onView={handleView}
             onDownload={handleDownload}
             onEdit={handleEditOpen}
             onDelete={handleDelete}
             onArchive={handleArchive}
+            onLock={handleLock}
+            onUnlock={handleUnlock}
             uploaderNames={uploaderNames}
           />
         </div>
@@ -512,7 +602,9 @@ export default function AdminDashboard() {
       <Modal isOpen={inviteModalOpen} onClose={() => setInviteModalOpen(false)} title="Invite New User">
         <div className="space-y-4">
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            Note: In production, this creates a Supabase auth invite. In demo mode, it adds to local state only.
+            {usingMock
+              ? 'Demo mode: this adds the user to local state only. No email is sent.'
+              : 'An invite email will be sent to this address. The recipient sets their password from the link, then logs in here.'}
           </p>
           <div>
             <label className="block text-sm font-medium mb-1 text-gray-900 dark:text-white">Email</label>
@@ -546,8 +638,12 @@ export default function AdminDashboard() {
             </select>
           </div>
           <div className="flex gap-2">
-            <Button onClick={handleInviteUser}>Invite</Button>
-            <Button onClick={() => setInviteModalOpen(false)} variant="secondary">Cancel</Button>
+            <Button onClick={handleInviteUser} isLoading={isInviting}>
+              {isInviting ? 'Sending...' : 'Send Invite'}
+            </Button>
+            <Button onClick={() => setInviteModalOpen(false)} variant="secondary" disabled={isInviting}>
+              Cancel
+            </Button>
           </div>
         </div>
       </Modal>

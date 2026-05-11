@@ -18,3 +18,5 @@ backend/dist/
 
 # Stray root lockfile (we use per-folder package.json)
 /package-lock.json
+
+*.tsbuildinfo
