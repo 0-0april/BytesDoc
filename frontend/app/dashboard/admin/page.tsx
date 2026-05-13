@@ -18,11 +18,13 @@ import DocumentViewerModal from '@/components/dashboard/DocumentViewerModal'
 import UploadModal from '@/components/dashboard/UploadModal'
 import UserTable from '@/components/dashboard/UserTable'
 import ActivityLogTable from '@/components/dashboard/ActivityLogTable'
+import AdministrationsPanel from '@/components/dashboard/AdministrationsPanel'
 import FileTypeIcon from '@/components/ui/FileTypeIcon'
+import { useAdministrationStore } from '@/lib/stores/administrationStore'
 import { FileText, Archive, Upload, Users, Activity, Download } from 'lucide-react'
 import { Document, User } from '@/types'
 import { apiGetDashboardStats, DashboardStats } from '@/lib/api'
-import { mockCategories, mockAdministrations } from '@/lib/mockData'
+import { mockCategories } from '@/lib/mockData'
 import { toast } from '@/lib/stores/toastStore'
 import { confirmDialog } from '@/lib/stores/confirmStore'
 
@@ -30,6 +32,7 @@ const TABS = [
   { name: 'Dashboard', href: '/dashboard/admin' },
   { name: 'Documents', href: '/dashboard/admin?tab=documents' },
   { name: 'Archive', href: '/dashboard/admin?tab=archive' },
+  { name: 'Administrations', href: '/dashboard/admin?tab=administrations' },
   { name: 'Users', href: '/dashboard/admin?tab=users' },
   { name: 'Activity Logs', href: '/dashboard/admin?tab=logs' },
 ]
@@ -55,10 +58,12 @@ export default function AdminDashboard() {
   } = useDocumentStore()
   const { users, fetchUsers, updateUserRole, inviteUser } = useUserStore()
   const { logs, remoteLogs, fetchLogs, exportLogs } = useActivityStore()
+  const { administrations, ensureLoaded: ensureAdminsLoaded } = useAdministrationStore()
 
   // ── Local UI state ──────────────────────────────────────────────────────
   const [searchTerm, setSearchTerm] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('All')
+  const [bulkLockAdmin, setBulkLockAdmin] = useState('')
   const [uploadModalOpen, setUploadModalOpen] = useState(false)
   const [viewModalOpen, setViewModalOpen] = useState(false)
   const [editModalOpen, setEditModalOpen] = useState(false)
@@ -84,6 +89,7 @@ export default function AdminDashboard() {
     if (!user) return
     fetchDocuments()
     fetchUsers()
+    ensureAdminsLoaded()
   }, [user])
 
   useEffect(() => {
@@ -339,15 +345,6 @@ export default function AdminDashboard() {
             <Card title="Recent Uploads (7d)" value={stats?.recentUploads ?? 0} icon={<Upload size={32} />} />
           </div>
 
-          {stats?.activitySummary && (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <Card title="Uploads (7d)" value={stats.activitySummary.uploads} />
-              <Card title="Downloads (7d)" value={stats.activitySummary.downloads} />
-              <Card title="Views (7d)" value={stats.activitySummary.views} />
-              <Card title="Logins (7d)" value={stats.activitySummary.logins} />
-            </div>
-          )}
-
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
               <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Documents per Category</h2>
@@ -447,8 +444,15 @@ export default function AdminDashboard() {
           </div>
 
           {(() => {
-            const lockableAdmins = [...new Set(activeDocs.filter(d => !d.is_locked).map(d => d.administration))]
-            if (lockableAdmins.length === 0) return null
+            const lockableCounts = new Map<string, number>()
+            for (const d of activeDocs) {
+              if (!d.is_locked) {
+                lockableCounts.set(d.administration, (lockableCounts.get(d.administration) ?? 0) + 1)
+              }
+            }
+            if (lockableCounts.size === 0) return null
+            const options = [...lockableCounts.entries()].sort(([a], [b]) => a.localeCompare(b))
+            const selectedCount = bulkLockAdmin ? lockableCounts.get(bulkLockAdmin) ?? 0 : 0
             return (
               <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
@@ -457,16 +461,32 @@ export default function AdminDashboard() {
                 <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
                   Marks every active (non-archived) document for the selected administration as read-only.
                 </p>
-                <div className="flex flex-wrap gap-2">
-                  {lockableAdmins.map(admin => (
-                    <Button
-                      key={admin}
-                      onClick={() => handleBulkLock(admin)}
-                      variant="secondary"
-                    >
-                      Lock All from {admin}
-                    </Button>
-                  ))}
+                <div className="flex flex-wrap gap-2 items-stretch">
+                  <select
+                    value={bulkLockAdmin}
+                    onChange={e => setBulkLockAdmin(e.target.value)}
+                    className="flex-1 min-w-[220px] px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+                  >
+                    <option value="">Select administration…</option>
+                    {options.map(([admin, count]) => (
+                      <option key={admin} value={admin}>
+                        {admin} — {count} lockable
+                      </option>
+                    ))}
+                  </select>
+                  <Button
+                    disabled={!bulkLockAdmin}
+                    onClick={async () => {
+                      const target = bulkLockAdmin
+                      await handleBulkLock(target)
+                      setBulkLockAdmin('')
+                    }}
+                    variant="secondary"
+                  >
+                    {bulkLockAdmin
+                      ? `Lock all ${selectedCount} from ${bulkLockAdmin}`
+                      : 'Lock all'}
+                  </Button>
                 </div>
               </div>
             )
@@ -497,6 +517,7 @@ export default function AdminDashboard() {
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Archive</h1>
           <ArchiveList
             documents={archivedDocs}
+            archivableDocs={activeDocs}
             onView={handleView}
             onDownload={handleDownload}
             canBulkArchive={true}
@@ -505,6 +526,9 @@ export default function AdminDashboard() {
           />
         </div>
       )}
+
+      {/* ── ADMINISTRATIONS TAB ──────────────────────────────── */}
+      {tab === 'administrations' && <AdministrationsPanel />}
 
       {/* ── USERS TAB ─────────────────────────────────────────── */}
       {tab === 'users' && (
@@ -601,7 +625,7 @@ export default function AdminDashboard() {
               onChange={e => setEditForm({ ...editForm, administration: e.target.value })}
               className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
             >
-              {mockAdministrations.map(a => <option key={a}>{a}</option>)}
+              {administrations.map(a => <option key={a.id} value={a.name}>{a.name}</option>)}
             </select>
           </div>
           <div className="flex gap-2">
@@ -671,6 +695,7 @@ function tabLabel(tab: string) {
     dashboard: 'Dashboard',
     documents: 'Documents',
     archive: 'Archive',
+    administrations: 'Administrations',
     users: 'Users',
     logs: 'Activity Logs',
   }

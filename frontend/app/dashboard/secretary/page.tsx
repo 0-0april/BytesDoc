@@ -17,9 +17,10 @@ import DocumentViewerModal from '@/components/dashboard/DocumentViewerModal'
 import UploadModal from '@/components/dashboard/UploadModal'
 import { FileText, Archive, Upload } from 'lucide-react'
 import { Document } from '@/types'
-import { mockEvents, mockAdministrations } from '@/lib/mockData'
+import { mockEvents } from '@/lib/mockData'
 import { toast } from '@/lib/stores/toastStore'
 import { confirmDialog } from '@/lib/stores/confirmStore'
+import { useAdministrationStore } from '@/lib/stores/administrationStore'
 
 export default function SecretaryDashboard() {
   const router = useRouter()
@@ -30,6 +31,9 @@ export default function SecretaryDashboard() {
   const { documents, addDocument, updateDocument, deleteDocument } = useDocumentStore()
   const { users } = useUserStore()
   const { addLog } = useActivityStore()
+  const { administrations, ensureLoaded: ensureAdminsLoaded } = useAdministrationStore()
+
+  useEffect(() => { ensureAdminsLoaded() }, [ensureAdminsLoaded])
 
   const SECRETARY_CATEGORIES = ['Proposals', 'Permits', 'Reports'] as const
 
@@ -300,7 +304,7 @@ export default function SecretaryDashboard() {
               onChange={e => setEditForm({ ...editForm, administration: e.target.value })}
               className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
             >
-              {mockAdministrations.map(adm => <option key={adm} value={adm}>{adm}</option>)}
+              {administrations.map(adm => <option key={adm.id} value={adm.name}>{adm.name}</option>)}
             </select>
           </div>
           <div className="flex gap-2">

@@ -238,6 +238,37 @@ export async function apiBulkLock(administration: string) {
   })
 }
 
+// ─── Administrations ────────────────────────────────────────────────────────
+
+export async function apiListAdministrations() {
+  return apiFetch<import('@/types').Administration[]>('/administrations')
+}
+
+export async function apiCreateAdministration(payload: {
+  name: string
+  startDate: string
+  endDate?: string | null
+}) {
+  return apiFetch<import('@/types').Administration>('/administrations', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function apiUpdateAdministration(
+  id: string,
+  payload: { name?: string; startDate?: string; endDate?: string | null },
+) {
+  return apiFetch<import('@/types').Administration>(`/administrations/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function apiDeleteAdministration(id: string) {
+  return apiFetch<void>(`/administrations/${id}`, { method: 'DELETE' })
+}
+
 // ─── Users ──────────────────────────────────────────────────────────────────
 
 export async function apiGetUsers() {

@@ -24,7 +24,8 @@ interface DocumentRow {
   title: string
   category: Document['category']
   event: string
-  administration: string
+  administration_id: string
+  administrations: { name: string } | null
   uploaded_by: string
   upload_date: string
   file_path: string
@@ -33,13 +34,15 @@ interface DocumentRow {
   file_type: Document['fileType']
 }
 
+const DOCUMENT_SELECT = '*, administrations(name)'
+
 function toDocument(r: DocumentRow): Document {
   return {
     id: r.id,
     title: r.title,
     category: r.category,
     event: r.event,
-    administration: r.administration,
+    administration: r.administrations?.name ?? '',
     uploadedBy: r.uploaded_by,
     uploadDate: r.upload_date,
     filePath: r.file_path,
@@ -47,6 +50,17 @@ function toDocument(r: DocumentRow): Document {
     is_locked: r.is_locked,
     fileType: r.file_type,
   }
+}
+
+export async function findAdministrationIdByName(name: string): Promise<string | null> {
+  const trimmed = name.trim()
+  if (!trimmed) return null
+  const { data } = await supabase
+    .from('administrations')
+    .select('id')
+    .ilike('name', trimmed)
+    .maybeSingle<{ id: string }>()
+  return data?.id ?? null
 }
 
 function categoryAllowedForRole(role: Role, category: Document['category']): boolean {
@@ -66,10 +80,14 @@ function canUploadCategory(role: Role, category: Document['category']): boolean 
 router.get('/', requireAuth, async (req: AuthedRequest, res, next) => {
   try {
     const { category, administration, archived, q } = req.query
-    let query = supabase.from('documents').select('*').order('upload_date', { ascending: false })
+    let query = supabase.from('documents').select(DOCUMENT_SELECT).order('upload_date', { ascending: false })
 
     if (typeof category === 'string') query = query.eq('category', category)
-    if (typeof administration === 'string') query = query.eq('administration', administration)
+    if (typeof administration === 'string') {
+      const adminId = await findAdministrationIdByName(administration)
+      if (!adminId) return res.json([])
+      query = query.eq('administration_id', adminId)
+    }
     if (archived === 'true') query = query.eq('is_archived', true)
     else if (archived === 'false') query = query.eq('is_archived', false)
     if (typeof q === 'string' && q.trim()) query = query.ilike('title', `%${q.trim()}%`)
@@ -89,7 +107,7 @@ router.get('/:id', requireAuth, async (req: AuthedRequest, res, next) => {
   try {
     const { data, error } = await supabase
       .from('documents')
-      .select('*')
+      .select(DOCUMENT_SELECT)
       .eq('id', req.params.id)
       .single<DocumentRow>()
 
@@ -128,6 +146,11 @@ router.post('/', requireAuth, upload.single('file'), async (req: AuthedRequest, 
       return res.status(403).json({ error: `your role cannot upload ${category}` })
     }
 
+    const administrationId = await findAdministrationIdByName(administration)
+    if (!administrationId) {
+      return res.status(400).json({ error: `administration "${administration}" does not exist` })
+    }
+
     // Phase 1: insert row to get an id, with a placeholder file_path.
     const { data: created, error: insertErr } = await supabase
       .from('documents')
@@ -135,12 +158,12 @@ router.post('/', requireAuth, upload.single('file'), async (req: AuthedRequest, 
         title,
         category,
         event,
-        administration,
+        administration_id: administrationId,
         uploaded_by: req.user!.id,
         file_path: 'pending',
         file_type: fileType,
       })
-      .select('*')
+      .select(DOCUMENT_SELECT)
       .single<DocumentRow>()
 
     if (insertErr || !created) {
@@ -162,7 +185,7 @@ router.post('/', requireAuth, upload.single('file'), async (req: AuthedRequest, 
       .from('documents')
       .update({ file_path: key })
       .eq('id', created.id)
-      .select('*')
+      .select(DOCUMENT_SELECT)
       .single<DocumentRow>()
 
     if (updateErr || !updated) {
@@ -182,7 +205,7 @@ router.put('/:id', requireAuth, async (req: AuthedRequest, res, next) => {
   try {
     const { data: existing, error: getErr } = await supabase
       .from('documents')
-      .select('*')
+      .select(DOCUMENT_SELECT)
       .eq('id', req.params.id)
       .single<DocumentRow>()
 
@@ -197,10 +220,16 @@ router.put('/:id', requireAuth, async (req: AuthedRequest, res, next) => {
     }
 
     const { title, category, event, administration } = req.body ?? {}
-    const patch: Partial<DocumentRow> = {}
+    const patch: Record<string, unknown> = {}
     if (typeof title === 'string') patch.title = title
     if (typeof event === 'string') patch.event = event
-    if (typeof administration === 'string') patch.administration = administration
+    if (typeof administration === 'string') {
+      const adminId = await findAdministrationIdByName(administration)
+      if (!adminId) {
+        return res.status(400).json({ error: `administration "${administration}" does not exist` })
+      }
+      patch.administration_id = adminId
+    }
     if (typeof category === 'string') {
       if (!CATEGORIES.includes(category as Document['category'])) {
         return res.status(400).json({ error: `category must be one of ${CATEGORIES.join(', ')}` })
@@ -216,7 +245,7 @@ router.put('/:id', requireAuth, async (req: AuthedRequest, res, next) => {
       .from('documents')
       .update(patch)
       .eq('id', req.params.id)
-      .select('*')
+      .select(DOCUMENT_SELECT)
       .single<DocumentRow>()
 
     if (updateErr || !updated) {
@@ -232,7 +261,7 @@ router.delete('/:id', requireAuth, async (req: AuthedRequest, res, next) => {
   try {
     const { data: existing, error: getErr } = await supabase
       .from('documents')
-      .select('*')
+      .select(DOCUMENT_SELECT)
       .eq('id', req.params.id)
       .single<DocumentRow>()
 
@@ -263,7 +292,7 @@ router.get('/:id/download', requireAuth, async (req: AuthedRequest, res, next) =
   try {
     const { data, error } = await supabase
       .from('documents')
-      .select('*')
+      .select(DOCUMENT_SELECT)
       .eq('id', req.params.id)
       .single<DocumentRow>()
 

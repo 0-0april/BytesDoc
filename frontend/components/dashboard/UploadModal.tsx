@@ -1,10 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Modal from '@/components/ui/Modal'
 import Button from '@/components/ui/Button'
-import { mockCategories, mockEvents, mockAdministrations } from '@/lib/mockData'
+import { mockCategories, mockEvents } from '@/lib/mockData'
 import { toast } from '@/lib/stores/toastStore'
+import { useAdministrationStore } from '@/lib/stores/administrationStore'
 
 interface UploadModalProps {
   isOpen: boolean
@@ -22,18 +23,33 @@ export default function UploadModal({
   onUpload,
   allowedCategories = mockCategories,
 }: UploadModalProps) {
+  const { administrations, ensureLoaded } = useAdministrationStore()
   const [formData, setFormData] = useState({
     title: '',
     category: allowedCategories[0] || 'Proposals',
     event: 'Freshmen Orientation',
-    administration: '2024-2025',
+    administration: '',
   })
   const [file, setFile] = useState<File | null>(null)
   const [isUploading, setIsUploading] = useState(false)
 
+  useEffect(() => {
+    if (isOpen) void ensureLoaded()
+  }, [isOpen, ensureLoaded])
+
+  useEffect(() => {
+    if (!formData.administration && administrations.length > 0) {
+      setFormData(f => ({ ...f, administration: administrations[0].name }))
+    }
+  }, [administrations, formData.administration])
+
   const handleSubmit = async () => {
     if (!formData.title.trim()) {
       toast.error('Please enter a title')
+      return
+    }
+    if (!formData.administration) {
+      toast.error('Please select an administration')
       return
     }
     setIsUploading(true)
@@ -43,7 +59,7 @@ export default function UploadModal({
         title: '',
         category: allowedCategories[0] || 'Proposals',
         event: 'Freshmen Orientation',
-        administration: '2024-2025',
+        administration: administrations[0]?.name ?? '',
       })
       setFile(null)
     } finally {
@@ -103,8 +119,11 @@ export default function UploadModal({
             onChange={e => setFormData({ ...formData, administration: e.target.value })}
             className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
           >
-            {mockAdministrations.map(adm => (
-              <option key={adm} value={adm}>{adm}</option>
+            {administrations.length === 0 && (
+              <option value="" disabled>No administrations yet — add one in the Administrations tab</option>
+            )}
+            {administrations.map(adm => (
+              <option key={adm.id} value={adm.name}>{adm.name}</option>
             ))}
           </select>
         </div>
