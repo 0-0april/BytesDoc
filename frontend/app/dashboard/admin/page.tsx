@@ -18,6 +18,7 @@ import DocumentViewerModal from '@/components/dashboard/DocumentViewerModal'
 import UploadModal from '@/components/dashboard/UploadModal'
 import UserTable from '@/components/dashboard/UserTable'
 import ActivityLogTable from '@/components/dashboard/ActivityLogTable'
+import FileTypeIcon from '@/components/ui/FileTypeIcon'
 import { FileText, Archive, Upload, Users, Activity, Download } from 'lucide-react'
 import { Document, User } from '@/types'
 import { apiGetDashboardStats, DashboardStats } from '@/lib/api'
@@ -377,7 +378,15 @@ export default function AdminDashboard() {
                     uploadDate: d.uploadDate, uploaderName: uploaderNames[d.uploadedBy] ?? 'Unknown',
                   }))).map(d => (
                     <tr key={d.id} className="border-b dark:border-gray-700">
-                      <td className="py-3 px-4 text-gray-900 dark:text-white">{d.title}</td>
+                      <td className="py-3 px-4 text-gray-900 dark:text-white">
+                        <span className="inline-flex items-center gap-2">
+                          {(() => {
+                            const ft = documents.find(doc => doc.id === d.id)?.fileType ?? 'pdf'
+                            return <FileTypeIcon fileType={ft} size={18} />
+                          })()}
+                          <span>{d.title}</span>
+                        </span>
+                      </td>
                       <td className="py-3 px-4 text-gray-600 dark:text-gray-400">{d.category}</td>
                       <td className="py-3 px-4 text-gray-600 dark:text-gray-400">{d.uploaderName}</td>
                       <td className="py-3 px-4 text-gray-600 dark:text-gray-400">
@@ -548,6 +557,10 @@ export default function AdminDashboard() {
         isOpen={viewModalOpen}
         onClose={() => setViewModalOpen(false)}
         document={selectedDoc}
+        uploaderName={selectedDoc ? uploaderNames[selectedDoc.uploadedBy] : undefined}
+        onEdit={(doc) => { setViewModalOpen(false); handleEditOpen(doc) }}
+        onRename={(doc) => { setViewModalOpen(false); handleEditOpen(doc) }}
+        onDelete={async (doc) => { setViewModalOpen(false); await handleDelete(doc) }}
       />
 
       {/* Edit Modal */}

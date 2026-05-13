@@ -4,6 +4,7 @@ import { Document } from '@/types'
 import { Download, Eye, Archive } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import EmptyState from '@/components/ui/EmptyState'
+import FileTypeIcon from '@/components/ui/FileTypeIcon'
 
 interface ArchiveListProps {
   documents: Document[]
@@ -67,7 +68,12 @@ export default function ArchiveList({
           <tbody>
             {documents.map((doc) => (
               <tr key={doc.id} className="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-                <td className="py-3 px-4 text-gray-900 dark:text-white">{doc.title}</td>
+                <td className="py-3 px-4 text-gray-900 dark:text-white">
+                  <span className="inline-flex items-center gap-2">
+                    <FileTypeIcon fileType={doc.fileType} size={18} />
+                    <span>{doc.title}</span>
+                  </span>
+                </td>
                 <td className="py-3 px-4 text-gray-600 dark:text-gray-400">{doc.category}</td>
                 <td className="py-3 px-4 text-gray-600 dark:text-gray-400">{doc.administration}</td>
                 <td className="py-3 px-4 text-gray-600 dark:text-gray-400">
