@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import multer from 'multer'
 import { supabase } from '../config/supabase'
-import { requireAuth, AuthedRequest } from '../middleware/auth'
+import { requireAuth, requireRole, AuthedRequest } from '../middleware/auth'
 import { logActivity } from '../lib/activityLog'
 import { uploadFile, createSignedUrl, deleteFile, buildKey } from '../lib/storage'
 import { Document, Role } from '../types'
@@ -279,5 +279,74 @@ router.get('/:id/download', requireAuth, async (req: AuthedRequest, res, next) =
     next(err)
   }
 })
+
+router.post(
+  '/:id/archive',
+  requireAuth,
+  requireRole('chief_minister'),
+  async (req: AuthedRequest, res, next) => {
+    try {
+      const { data: existing, error: getErr } = await supabase
+        .from('documents')
+        .select('*')
+        .eq('id', req.params.id)
+        .single<DocumentRow>()
+
+      if (getErr || !existing) return res.status(404).json({ error: 'document not found' })
+      if (existing.is_archived) {
+        return res.status(409).json({ error: 'document already archived' })
+      }
+
+      const { data: updated, error: updateErr } = await supabase
+        .from('documents')
+        .update({ is_archived: true, is_locked: true })
+        .eq('id', req.params.id)
+        .select('*')
+        .single<DocumentRow>()
+
+      if (updateErr || !updated) {
+        return res.status(500).json({ error: updateErr?.message ?? 'archive failed' })
+      }
+
+      logActivity({ userId: req.user!.id, action: 'archive', documentId: updated.id })
+      res.json(toDocument(updated))
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.post(
+  '/archive-bulk',
+  requireAuth,
+  requireRole('chief_minister'),
+  async (req: AuthedRequest, res, next) => {
+    try {
+      const { administration } = req.body ?? {}
+      if (typeof administration !== 'string' || !administration.trim()) {
+        return res.status(400).json({ error: 'administration is required' })
+      }
+
+      const { data: updated, error: updateErr } = await supabase
+        .from('documents')
+        .update({ is_archived: true, is_locked: true })
+        .eq('administration', administration)
+        .eq('is_archived', false)
+        .select('id')
+        .returns<{ id: string }[]>()
+
+      if (updateErr) return res.status(500).json({ error: updateErr.message })
+
+      const archivedIds = (updated ?? []).map((r) => r.id)
+      for (const id of archivedIds) {
+        logActivity({ userId: req.user!.id, action: 'archive', documentId: id })
+      }
+
+      res.json({ administration, archivedCount: archivedIds.length, archivedIds })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
 
 export default router
