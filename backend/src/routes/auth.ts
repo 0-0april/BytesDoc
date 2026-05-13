@@ -55,6 +55,28 @@ router.post('/login', async (req, res, next) => {
     res.json({
       user: toUser(profile),
       token: data.session.access_token,
+      refreshToken: data.session.refresh_token,
+      expiresAt: (data.session.expires_at ?? 0) * 1000,
+    })
+  } catch (err) {
+    next(err)
+  }
+})
+
+router.post('/refresh', async (req, res, next) => {
+  try {
+    const { refreshToken } = req.body ?? {}
+    if (!refreshToken) {
+      return res.status(400).json({ error: 'refreshToken is required' })
+    }
+    const { data, error } = await supabasePublic.auth.refreshSession({ refresh_token: refreshToken })
+    if (error || !data.session) {
+      return res.status(401).json({ error: 'refresh failed' })
+    }
+    res.json({
+      token: data.session.access_token,
+      refreshToken: data.session.refresh_token,
+      expiresAt: (data.session.expires_at ?? 0) * 1000,
     })
   } catch (err) {
     next(err)
