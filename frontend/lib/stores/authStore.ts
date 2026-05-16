@@ -7,6 +7,8 @@ import { apiLogin, apiLogout } from '@/lib/api'
 interface AuthState {
   user: User | null
   token: string | null
+  refreshToken: string | null
+  expiresAt: number | null
   isAuthenticated: boolean
   usingMock: boolean
   hasHydrated: boolean
@@ -21,14 +23,23 @@ export const useAuthStore = create<AuthState>()(
     (set, get) => ({
       user: null,
       token: null,
+      refreshToken: null,
+      expiresAt: null,
       isAuthenticated: false,
       usingMock: false,
       hasHydrated: false,
 
       login: async (email: string, password: string) => {
         try {
-          const { user, token } = await apiLogin(email, password)
-          set({ user, token, isAuthenticated: true, usingMock: false })
+          const { user, token, refreshToken, expiresAt } = await apiLogin(email, password)
+          set({
+            user,
+            token,
+            refreshToken: refreshToken ?? null,
+            expiresAt: expiresAt ?? null,
+            isAuthenticated: true,
+            usingMock: false,
+          })
           return true
         } catch {
           return false
@@ -39,7 +50,14 @@ export const useAuthStore = create<AuthState>()(
         if (get().token) {
           try { await apiLogout() } catch {}
         }
-        set({ user: null, token: null, isAuthenticated: false, usingMock: false })
+        set({
+          user: null,
+          token: null,
+          refreshToken: null,
+          expiresAt: null,
+          isAuthenticated: false,
+          usingMock: false,
+        })
       },
 
       setUser: (user: User) => set({ user }),
@@ -50,6 +68,8 @@ export const useAuthStore = create<AuthState>()(
       partialize: (state) => ({
         user: state.user,
         token: state.token,
+        refreshToken: state.refreshToken,
+        expiresAt: state.expiresAt,
         isAuthenticated: state.isAuthenticated,
         usingMock: state.usingMock,
       }),

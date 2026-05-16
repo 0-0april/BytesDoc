@@ -5,16 +5,75 @@ const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api'
 
 // ─── Token helpers ──────────────────────────────────────────────────────────
 
-function getToken(): string | null {
-  if (typeof window === 'undefined') return null
+interface AuthSnapshot {
+  token: string | null
+  refreshToken: string | null
+  expiresAt: number | null
+}
+
+function readAuth(): AuthSnapshot {
+  if (typeof window === 'undefined') return { token: null, refreshToken: null, expiresAt: null }
   try {
     const raw = localStorage.getItem('auth-storage')
-    if (!raw) return null
-    const parsed = JSON.parse(raw)
-    return parsed?.state?.token ?? null
+    if (!raw) return { token: null, refreshToken: null, expiresAt: null }
+    const s = JSON.parse(raw)?.state ?? {}
+    return {
+      token: s.token ?? null,
+      refreshToken: s.refreshToken ?? null,
+      expiresAt: s.expiresAt ?? null,
+    }
   } catch {
-    return null
+    return { token: null, refreshToken: null, expiresAt: null }
   }
+}
+
+// In-flight refresh promise so concurrent calls coalesce into one network round-trip
+let refreshInFlight: Promise<string | null> | null = null
+
+async function refreshAccessToken(): Promise<string | null> {
+  if (refreshInFlight) return refreshInFlight
+  const { refreshToken } = readAuth()
+  if (!refreshToken) return null
+
+  refreshInFlight = (async () => {
+    try {
+      const res = await fetch(`${BASE_URL}/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken }),
+      })
+      if (!res.ok) {
+        // Refresh token itself is no longer valid — clear session so the next route guard bounces to /login
+        try {
+          const mod = await import('@/lib/stores/authStore')
+          mod.useAuthStore.setState({
+            user: null,
+            token: null,
+            refreshToken: null,
+            expiresAt: null,
+            isAuthenticated: false,
+          })
+        } catch {}
+        return null
+      }
+      const body = (await res.json()) as { token: string; refreshToken: string; expiresAt: number }
+      try {
+        const mod = await import('@/lib/stores/authStore')
+        mod.useAuthStore.setState({
+          token: body.token,
+          refreshToken: body.refreshToken,
+          expiresAt: body.expiresAt,
+        })
+      } catch {}
+      return body.token
+    } catch {
+      return null
+    } finally {
+      refreshInFlight = null
+    }
+  })()
+
+  return refreshInFlight
 }
 
 // ─── Core fetch wrapper ──────────────────────────────────────────────────────
@@ -24,19 +83,38 @@ async function apiFetch<T>(
   options: RequestInit = {},
   authenticated = true
 ): Promise<T> {
-  const headers: Record<string, string> = {
+  const baseHeaders: Record<string, string> = {
     ...(options.body && !(options.body instanceof FormData)
       ? { 'Content-Type': 'application/json' }
       : {}),
     ...(options.headers as Record<string, string> ?? {}),
   }
 
-  if (authenticated) {
-    const token = getToken()
-    if (token) headers['Authorization'] = `Bearer ${token}`
+  const buildHeaders = (tok: string | null) =>
+    authenticated && tok ? { ...baseHeaders, Authorization: `Bearer ${tok}` } : baseHeaders
+
+  let auth = readAuth()
+
+  // Proactive refresh if token is about to expire within 30s
+  if (
+    authenticated &&
+    auth.refreshToken &&
+    auth.expiresAt !== null &&
+    Date.now() > auth.expiresAt - 30_000
+  ) {
+    const fresh = await refreshAccessToken()
+    if (fresh) auth = { ...auth, token: fresh }
   }
 
-  const res = await fetch(`${BASE_URL}${path}`, { ...options, headers })
+  let res = await fetch(`${BASE_URL}${path}`, { ...options, headers: buildHeaders(auth.token) })
+
+  // Reactive refresh on 401 (token rejected server-side)
+  if (authenticated && res.status === 401 && auth.refreshToken) {
+    const fresh = await refreshAccessToken()
+    if (fresh) {
+      res = await fetch(`${BASE_URL}${path}`, { ...options, headers: buildHeaders(fresh) })
+    }
+  }
 
   if (!res.ok) {
     let message = `API error ${res.status}`
@@ -59,7 +137,12 @@ async function apiFetch<T>(
 // ─── Auth ───────────────────────────────────────────────────────────────────
 
 export async function apiLogin(email: string, password: string) {
-  return apiFetch<{ user: import('@/types').User; token: string }>(
+  return apiFetch<{
+    user: import('@/types').User
+    token: string
+    refreshToken: string
+    expiresAt: number
+  }>(
     '/auth/login',
     { method: 'POST', body: JSON.stringify({ email, password }) },
     false
@@ -153,6 +236,37 @@ export async function apiBulkLock(administration: string) {
     method: 'POST',
     body: JSON.stringify({ administration }),
   })
+}
+
+// ─── Administrations ────────────────────────────────────────────────────────
+
+export async function apiListAdministrations() {
+  return apiFetch<import('@/types').Administration[]>('/administrations')
+}
+
+export async function apiCreateAdministration(payload: {
+  name: string
+  startDate: string
+  endDate?: string | null
+}) {
+  return apiFetch<import('@/types').Administration>('/administrations', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function apiUpdateAdministration(
+  id: string,
+  payload: { name?: string; startDate?: string; endDate?: string | null },
+) {
+  return apiFetch<import('@/types').Administration>(`/administrations/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function apiDeleteAdministration(id: string) {
+  return apiFetch<void>(`/administrations/${id}`, { method: 'DELETE' })
 }
 
 // ─── Users ──────────────────────────────────────────────────────────────────

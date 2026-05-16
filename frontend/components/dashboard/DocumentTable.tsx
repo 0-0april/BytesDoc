@@ -3,6 +3,7 @@
 import { Document } from '@/types'
 import { Download, Eye, Edit, Trash2, Archive, FileText, Lock, Unlock } from 'lucide-react'
 import EmptyState from '@/components/ui/EmptyState'
+import FileTypeIcon from '@/components/ui/FileTypeIcon'
 
 interface DocumentTableProps {
   documents: Document[]
@@ -66,8 +67,9 @@ export default function DocumentTable({
           {documents.map((doc) => (
             <tr key={doc.id} className="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
               <td className="py-3 px-4 text-gray-900 dark:text-white">
-                <span className="inline-flex items-center gap-1.5">
-                  {doc.title}
+                <span className="inline-flex items-center gap-2">
+                  <FileTypeIcon fileType={doc.fileType} size={18} />
+                  <span>{doc.title}</span>
                   {doc.is_locked && !doc.is_archived && (
                     <span
                       className="inline-flex items-center gap-1 text-xs bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-2 py-0.5 rounded-full"
